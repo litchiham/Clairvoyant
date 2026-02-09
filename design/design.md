@@ -5,10 +5,10 @@
 ## 数据输入
 1. 原始cube
 2. 预处理后的*.pkl
-3. 预测后的*.pkl
+3. 预测后的*.npz
 ## 数据输出
 1. 预处理后的*.pkl
-2. 预测后的*.pkl/其他格式
+2. 预测后的*.npz/其他格式
 ## 结构
 引用关系
 GUI->Process平行Predict->CubeIO
@@ -31,7 +31,7 @@ GUI->Process平行Predict->CubeIO
           -precessed
             -ORBXXXX_processed.pkl
           -predicted
-            -ORBXXXX_predicted.pkl
+            -ORBXXXX_predicted.npz
         '''
         def set_base_py_path(self, path):
         def get_base_bin_path(self):
@@ -52,12 +52,12 @@ GUI->Process平行Predict->CubeIO
     #predict.py
     class Predicted:
         '''存储和处理一个cube的预测结果'''
-        '''需要商榷'''
+        points=np.array([{'lon','lat','?'}])
     class Predict:
         Processed_data_paths = []
         def import_cubes(self, ['filepath'])->bool:
         '''向raw_data_list中导入路径'''
-        def predict_cubes(self, save=True)->bool:
+        def predict_cubes(self, save=True, save_as=['npz'])->bool:
         '''使用CubeIO接口'''
         '''注意与GUI协调多线程,信号/槽实现进度条'''
         '''执行预处理逻辑'''
