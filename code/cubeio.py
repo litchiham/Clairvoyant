@@ -199,7 +199,7 @@ class CubeIO:
     # 功能：调用omegapy模块的OMEGAdata类创建数据对象
     def _load_raw(self,cube_name:str):
         log('CubeIO._load_raw', f'开始加载立方体 {cube_name}，类型 raw', 'DEBUG')
-        ret_omega_data=od.OMEGAdata(cube_name)
+        ret_omega_data=od.OMEGAdata(cube_name,disp=False)
         return ret_omega_data
     
     # 私有方法：加载处理后的Python数据
