@@ -2,6 +2,7 @@ import omegapy.omega_data as od
 import numpy as np
 import cubeio as cio
 import os
+from config import *
 
 import glob
 import xarray as xr
@@ -31,11 +32,11 @@ class Process:
 
     H = 11.0
     
-    def __init__(self, bin_path:str, py_path:str, buffer_path:str, dust_path:str):
-        self._base_bin_path = bin_path
-        self._base_py_path = py_path
-        self._base_buffer_path = buffer_path
-        self._dust_file_path = dust_path
+    def __init__(self):
+        self._base_bin_path = config.bin_path
+        self._base_py_path = config.py_path
+        self._base_buffer_path = config.buffer_path
+        self._dust_file_path = config.dust_path
         self._OUTPUT_DIR_No = os.path.join(self._base_py_path,'processed')
         self._OUTPUT_DIR_clean_cube = os.path.join(self._base_py_path,'processed')
         self._OUTPUT_DIR_atm= os.path.join(self._base_py_path,'processed')
@@ -300,10 +301,10 @@ class Process:
         self._process_all_parallel()
         
 if __name__ == "__main__":
-    cio.log_level = 'INFO'
-    process = Process(buffer_path = r'D:\Project\Clairvoyant-buffer', bin_path=r'D:\Project\Clairvoyant-data\bin',py_path= r'D:\Project\Clairvoyant-data\py',dust_path=r'D:\Project\Clairvoyant-dust\krigedcdod_v2')
+    process = Process()
     process.import_cubes(['0982_3'])
     process.process_cubes()
+    cio.log('Process', 'Processing completed.', 'INFO')
 
     
     

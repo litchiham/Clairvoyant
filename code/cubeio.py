@@ -7,6 +7,7 @@
 # predict: 预测模块，用于处理预测结果
 # typing.Literal: 类型提示模块，用于指定字符串字面量类型，提高代码可读性和类型安全性
 
+from config import *
 import omegapy.omega_data as od
 import omegapy.omega_plots as op
 import os
@@ -25,7 +26,7 @@ from typing import Literal
 #   'WARNING':2 - 警告信息，潜在问题
 #   'ERROR':3 - 错误信息，程序异常
 
-log_level = 'DEBUG'
+log_level = config.log_level
 _log_levels={
     'DEBUG':0,
     'INFO':1,
@@ -75,15 +76,16 @@ class CubeIO:
     # 注意：
     #   - omegapy.set_omega_bin_path() 设置原始数据路径
     #   - omegapy.set_omega_py_path() 设置处理后数据路径（指向'processed'子目录）
-    def __init__(self, bin_path:str, py_path:str, buffer_path='~/buffer'):
-        if(os.path.exists(buffer_path) == False):
-            os.mkdir(buffer_path)
+    def __init__(self):
         
-        self._base_bin_path = bin_path
-        self._base_py_path = py_path
-        self._base_buffer_path = buffer_path
-        od.set_omega_bin_path(bin_path)
-        pkl_path = os.path.join(py_path, 'processed')
+        
+        self._base_bin_path = config.bin_path
+        self._base_py_path = config.py_path
+        self._base_buffer_path = config.buffer_path
+        if(os.path.exists(self._base_buffer_path) == False):
+            os.mkdir(self._base_buffer_path)
+        od.set_omega_bin_path(self._base_bin_path)
+        pkl_path = os.path.join(self._base_py_path, 'processed')
         od.set_omega_py_path(pkl_path)  #此处存在语义不清
     # 获取指定类型的数据路径
     # 参数：
@@ -232,7 +234,7 @@ if __name__ == '__main__':
     #   bin_path: 原始二进制数据目录（D:\Project\Clairvoyant-data\bin）
     #   py_path: Python处理数据目录（D:\Project\Clairvoyant-data\py）
     #   buffer_path: 临时缓冲区路径（D:\Project\Clairvoyant-buffer）
-    cubeio=CubeIO(r"D:\Project\Clairvoyant-data\bin", r"D:\Project\Clairvoyant-data\py", r"D:\Project\Clairvoyant-buffer")
+    cubeio=CubeIO()
     # 加载指定名称的原始立方体数据
     # cube_name: '0982_3' - 示例立方体名称
     # type: 'raw' - 加载原始二进制数据
