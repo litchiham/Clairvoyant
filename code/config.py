@@ -9,6 +9,9 @@ class Config:
 
     # log
     log_level = 'DEBUG'
+
+    #batch
+    batch_size = 64
     def __init__(self):
         pass
 

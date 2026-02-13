@@ -58,9 +58,11 @@ def jxjz(x,y_uniform):
     judge=1
     dev=[]
     while judge:
+        
         p1 = np.polyfit(x_remove0, y_remove0, n)  
         y_fit1 = np.polyval(p1, x_remove0)  
-        r1 = y_remove0 - y_fit1
+        r1 = y_remove0 - y_fit1 
+        
         dev1 = np.sqrt(np.sum((r1 - np.mean(r1)) ** 2) / len(r1)) 
         dev.append(dev1)
         if i == 0:
@@ -92,17 +94,18 @@ def Load_intensity_3c(source_cube_name = None):
     y_num=cube.cube_rf.shape[1]
     lam_num=cube.cube_rf.shape[2]
     Myinput=np.zeros([x_num, y_num, 3, lam_num-2], dtype=float)
-        #load real data
-
+    #预计算
+    wavelengths = cube.lam
+    x_pred = np.linspace(0.865,2.385,num=lam_num-2)
     # interpolate spectrum
     for i in range(x_num):
         for j in range(y_num):        
-            wavelengths = cube.lam
+            
             intensity = cube.cube_rf[i,j,:]
             #nor+baseline
             intensity1 = jxjz(wavelengths,nor(SG(intensity)))
             f2 = interpolate.interp1d(wavelengths,intensity1,kind='cubic')
-            x_pred = np.linspace(0.865,2.385,num=lam_num-2)
+            
             y_pred = f2(x_pred)
             
             #original
@@ -112,19 +115,18 @@ def Load_intensity_3c(source_cube_name = None):
             Myinput[i][j][1][1:] = y_pred
             #2st
             y_pred = np.diff(y_pred)  
-            Myinput[i][j][1][1:-1] = y_pred
-
-            cio.log('predict-real-data', f'processed {cube.lat[i,j]} , {cube.lon[i,j]}', 'DEBUG')
+            Myinput[i][j][2][1:-1] = y_pred
+        cio.log('predict-real-data', f'processed {(i*y_num+j)/(x_num*y_num)*100:.2f}%', 'DEBUG')
                                 
     SpectrumData = Myinput
     
-    return SpectrumData    
+    return SpectrumData,cube.lat,cube.lon
 
 class FeatureDataset(Data.Dataset):
     def __init__(self, args, mode='train',type='Mn'):
             
         # get Data
-        Myinput = Load_intensity_3c()                                                  
+        Myinput, lats, lons = Load_intensity_3c()                                                  
         # print(Myinput.shape)        
         self.data_code = Myinput
         self.transform = transforms.Compose([
