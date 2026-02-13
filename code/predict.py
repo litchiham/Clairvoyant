@@ -3,8 +3,7 @@ from real_data_2 import *
 import os
 import warnings
 warnings.filterwarnings('ignore')
-from scipy import signal
-from scipy import interpolate
+
 
 
 import cubeio as cio
@@ -110,21 +109,11 @@ class Predict:
         cube_lat = cube.lat.reshape(-1, *(cube.lat.shape[2:]))
         cube_lon = cube.lon.reshape(-1, *(cube.lon.shape[2:]))
         cube_lam = cube.lam
-        
-        #nor+baseline
-        intensity1 = jxjz(cube_lam,nor(SG(cube_rf)))
-        f2 = interpolate.interp1d(cube_lam,intensity1,kind='cubic')
-        x_pred = np.linspace(0.865,2.385,num=305)
-        y_pred = f2(x_pred)
-        Myinput = np.zeros([cube_rf.shape[0], 3, 305], dtype=float)
-        #original
-        Myinput[i][0][:] = y_pred       
-        #1st
-        y_pred = np.diff(y_pred)         
-        Myinput[i][1][1:] = y_pred
-        #2st
-        y_pred = np.diff(y_pred)  
-        Myinput[i][2][1:-1] = y_pred
+        spectra_num = cube_rf.shape[0]
+        Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
+        for i in range(spectra_num):
+            Myinput[i] = get3c(cube_rf[i], cube_lam)
+            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'DEBUG')
 
         # create model
         if args.data == 'Mn':
@@ -162,7 +151,7 @@ class Predict:
         criterion = nn.BCEWithLogitsLoss().cuda()
 
         # evaluate on test set
-        self. test(cube_rf, model, criterion)
+        self. test(Myinput, model, criterion)
 
 
 

@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import torch.utils.data as Data
 import torchvision.transforms as transforms
-import omegapy.omega_data as od
-import omegapy.omega_plots as op
+
+from scipy import signal
+from scipy import interpolate
 
 import cubeio as cio
 from config import *
@@ -60,10 +61,12 @@ def jxjz(x,y_uniform):
     
     return y_baseline_correction
 
-def get3c(x,wavelengths):
+def get3c(intensity,wavelengths):
     Myinput = np.zeros([3, 305], dtype=float)
-    y_pred = jxjz(wavelengths,nor(SG(x)))
-
+    y_pred = jxjz(wavelengths,nor(SG(intensity)))
+    f2 = interpolate.interp1d(wavelengths,y_pred,kind='cubic')
+    x_pred = np.linspace(0.865,2.385,num=305)
+    y_pred = f2(x_pred)
     # original\n",
     Myinput[0][:] = y_pred
 
@@ -74,4 +77,5 @@ def get3c(x,wavelengths):
     #计算相邻差作为二阶导\n",
     y_pred = np.diff(y_pred)  
     Myinput[2][1:-1] = y_pred
+    
     return Myinput
