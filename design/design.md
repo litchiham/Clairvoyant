@@ -52,7 +52,7 @@ GUI->Process平行Predict->CubeIO
     #predict.py
     class Predicted:
         '''存储和处理一个cube的预测结果'''
-        points=np.array([{'lon','lat','?'}])
+        points=np.array([{'lon','lat','reg', 'class'}])
     class Predict:
         Processed_data_paths = []
         def import_cubes(self, ['filepath'])->bool:

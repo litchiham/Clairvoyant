@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.utils.data as Data
 import torchvision.transforms as transforms
 import omegapy.omega_data as od
+import omegapy.omega_plots as op
 
 import cubeio as cio
 from config import *
@@ -57,9 +58,11 @@ def jxjz(x,y_uniform):
     judge=1
     dev=[]
     while judge:
+        
         p1 = np.polyfit(x_remove0, y_remove0, n)  
         y_fit1 = np.polyval(p1, x_remove0)  
-        r1 = y_remove0 - y_fit1
+        r1 = y_remove0 - y_fit1 
+        
         dev1 = np.sqrt(np.sum((r1 - np.mean(r1)) ** 2) / len(r1)) 
         dev.append(dev1)
         if i == 0:
@@ -80,46 +83,50 @@ class DataLoaderX(DataLoader):
 def Load_intensity_3c(source_cube_name = None):
     print('Data Loading...')     
     
-    if source_cube_name is None:
-        #load default data
-        data_dir = r'Mars.xlsx'
-        data = pd.read_excel(data_dir,sheet_name = 0,  engine='openpyxl')    
-        spectra_num = 3   
-        Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
-    elif(isinstance(source_cube_name, str)):
+    if(isinstance(source_cube_name, str)):
         cubeio=cio.CubeIO()
         cube = cubeio.load(source_cube_name, 'processed')
+        print(cube.cube_rf)
         print(cube.cube_rf.shape)
-        #load real data
-
+        op.show_omega_interactif_v2(cube)
+        input("press any key to continue...")
+    x_num=cube.cube_rf.shape[0]
+    y_num=cube.cube_rf.shape[1]
+    lam_num=cube.cube_rf.shape[2]
+    Myinput=np.zeros([x_num, y_num, 3, lam_num-2], dtype=float)
+    #预计算
+    wavelengths = cube.lam
+    x_pred = np.linspace(0.865,2.385,num=lam_num-2)
     # interpolate spectrum
-    for i in range(spectra_num):        
-        wavelengths = data.values[:,0]
-        intensity = data.values[:,(i+1)]
-        #nor+baseline
-        intensity1 = jxjz(wavelengths,nor(SG(intensity)))
-        f2 = interpolate.interp1d(wavelengths,intensity1,kind='cubic')
-        x_pred = np.linspace(0.865,2.385,num=305)
-        y_pred = f2(x_pred)
-        
-        #original
-        Myinput[i][0][:] = y_pred       
-        #1st
-        y_pred = np.diff(y_pred)         
-        Myinput[i][1][1:] = y_pred
-        #2st
-        y_pred = np.diff(y_pred)  
-        Myinput[i][1][1:-1] = y_pred
+    for i in range(x_num):
+        for j in range(y_num):        
+            
+            intensity = cube.cube_rf[i,j,:]
+            #nor+baseline
+            intensity1 = jxjz(wavelengths,nor(SG(intensity)))
+            f2 = interpolate.interp1d(wavelengths,intensity1,kind='cubic')
+            
+            y_pred = f2(x_pred)
+            
+            #original
+            Myinput[i][j][0][:] = y_pred       
+            #1st
+            y_pred = np.diff(y_pred)         
+            Myinput[i][j][1][1:] = y_pred
+            #2st
+            y_pred = np.diff(y_pred)  
+            Myinput[i][j][2][1:-1] = y_pred
+        cio.log('predict-real-data', f'processed {(i*y_num+j)/(x_num*y_num)*100:.2f}%', 'DEBUG')
                                 
     SpectrumData = Myinput
     
-    return SpectrumData    
+    return SpectrumData,cube.lat,cube.lon
 
 class FeatureDataset(Data.Dataset):
     def __init__(self, args, mode='train',type='Mn'):
             
         # get Data
-        Myinput = Load_intensity_3c()                                                  
+        Myinput, lats, lons = Load_intensity_3c()                                                  
         # print(Myinput.shape)        
         self.data_code = Myinput
         self.transform = transforms.Compose([

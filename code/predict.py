@@ -1,7 +1,16 @@
 import numpy as np
-import real_data
+from real_data_2 import *
 import os
+import warnings
+warnings.filterwarnings('ignore')
+
+
+
 import cubeio as cio
+import omegapy.omega_data as od
+import omegapy.useful_functions as uf
+import argparse
+from config import *
 
 import time
 
@@ -83,20 +92,28 @@ class Predict:
     best_sen = 0
     best_spe = 0
     _base_py_path=''
-    def __init__(self, bin_path:str, py_path:str, buffer_path:str, dust_path:str):
-        self._base_py_path = py_path
-        self._base_buffer_path = buffer_path
+    def __init__(self):
+        self._base_py_path = config.py_path
+        self._base_buffer_path = config.buffer_path
         cio.log('Process', 'Initialization', 'INFO')
-    def main(self):
+    def predict_cube(self, cube_name):
         global args
         # if args.tensorboard: configure("runs/%s"%(args.name))
         
         # Data loading code
         kwargs = {'num_workers': 8, 'pin_memory': True}       
         #datasets
-        test_dataset = real_data.FeatureDataset(args, mode = 'test',type=args.data)
-        test_loader = real_data.DataLoaderX(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
-            
+        cubeio = cio.CubeIO()
+        cube = cubeio.load(cube_name=cube_name, type='processed')
+        cube_rf = cube.cube_rf.reshape(-1, *(cube.cube_rf.shape[2:]))
+        cube_lat = cube.lat.reshape(-1, *(cube.lat.shape[2:]))
+        cube_lon = cube.lon.reshape(-1, *(cube.lon.shape[2:]))
+        cube_lam = cube.lam
+        spectra_num = cube_rf.shape[0]
+        Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
+        for i in range(spectra_num):
+            Myinput[i] = get3c(cube_rf[i], cube_lam)
+            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'DEBUG')
 
         # create model
         if args.data == 'Mn':
@@ -134,11 +151,11 @@ class Predict:
         criterion = nn.BCEWithLogitsLoss().cuda()
 
         # evaluate on test set
-        self. test(test_loader, model, criterion)
+        self. test(Myinput, model, criterion)
 
 
 
-    def test(self, test_loader, model, criterion):
+    def test(self, target_data, model, criterion):
         """Perform validation on the validation set"""
         batch_time = AverageMeter()
         losses = AverageMeter()
@@ -147,7 +164,7 @@ class Predict:
         Corr = 0
         auroc = 0
         total_correct = 0
-        total_num = 0    
+        total_num = 0
 
 
         # switch to evaluate mode
@@ -162,31 +179,40 @@ class Predict:
         l_w =0
         a=0
 
-        end = time.time()
-        for i, (target) in enumerate(test_loader):        
-
-            target = target.type(torch.FloatTensor)                 
-            target = target.cuda() 
+        # 转换target_data为torch张量
+        target_tensor = torch.from_numpy(target_data).float()
         
-            with torch.no_grad():
-                target_var = torch.autograd.Variable(target)
-
-            # spectra metrics learning
-            all = np.load('features/features_Mn.npz')
-            all_label = np.load('features/labels_Mn.npz')
-
-            all = torch.from_numpy(all['arr_0'] )
-            all = all.type(torch.FloatTensor)
-            all_label = torch.from_numpy(all_label['arr_0'] )
-            all_label = all_label.type(torch.FloatTensor)        
+        # 加载all和all_label数据
+        all = np.load('features/features_Mn.npz')
+        all_label = np.load('features/labels_Mn.npz')
+        all = torch.from_numpy(all['arr_0']).float()
+        all_label = torch.from_numpy(all_label['arr_0']).float()
+        
+        # 移动到GPU
+        if torch.cuda.is_available():
+            target_tensor = target_tensor.cuda()
             all = all.cuda()
             all_label = all_label.cuda()
+
+        
+        
+        end = time.time()
+        batch_size = config.batch_size
+        n_samples = target_tensor.size(0)
+        # 分批处理数据（模拟原始函数的循环）
+        for start_idx in range(0, n_samples, batch_size):
+            end_idx = min(start_idx + batch_size, n_samples)
+            target_batch = target_tensor[start_idx:end_idx]
             
+            with torch.no_grad():
+                target_var = torch.autograd.Variable(target_batch)
+
             # compute output
-            output = model.predict(target_var,all, all_label)
+            output = model.predict(target_var, all, all_label)
             
-            # measure metrics       
+            # measure metrics
             output1 = output.cpu()
+
             #reg
             # output1 = np.maximum(output1.detach().numpy(),0)
             #class
@@ -194,9 +220,9 @@ class Predict:
             
             # #save class probability
             # df1 = pd.DataFrame(output1.detach().numpy())
-            # df1.to_excel('class_pro.xlsx',  
-                # index=False,         
-                # engine='openpyxl')   
+            # df1.to_excel('class_pro.xlsx',
+                # index=False,
+                # engine='openpyxl')
 
             y_pred.extend(output1.tolist())
 
@@ -230,10 +256,8 @@ def adjust_learning_rate(optimizer, epoch):
             param_group['lr'] = lr
     
 if __name__ == '__main__':
-    predicted_cube = Predicted()
-    predicted_cube.append([1, 2, 3, 4, 5])
-
-    print(type(predicted_cube.to_array()))
+    predict=Predict()
+    predict.predict_cube('0982_3')
         
     
     
