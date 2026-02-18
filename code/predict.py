@@ -44,45 +44,7 @@ class Args:
 
 args = Args()
 
-class Predicted:
-    '''存储和一个cube的预测结果'''
-    
-    def __init__(self, points_array=None):
-        """
-        初始化预测结果对象
-        
-        参数:
-        points_array: numpy数组，形状为(n, 5)，每行代表一个点
-        [lon, lat, classification_x1, classification_x2, reg]
-        """
-        if points_array is None:
-            self.points = np.empty((0, 5))  # 创建空的5列数组
-        else:
-            self.points = np.array(points_array, dtype=float)
-    
-    def get(self, key):
-        if self.points.size == 0:
-            return np.array([])
-            
-        key_map = {
-            'lon': 0,
-            'lat': 1, 
-            'class_x1': 2,
-            'class_x2': 3,
-            'reg': 4
-        }
-        
-        if key not in key_map:
-            raise ValueError(f"不支持的key: {key}")
-            
-        col_idx = key_map[key]
-        return self.points[:, col_idx]
-    
-    # 一些辅助方法
-    def append(self, point):
-        self.points = np.append(self.points, [point], axis=0)
-    def to_array(self):
-        return self.points
+
 
 class Predict:
     cube_names = [] #for example ['0006_0']
@@ -105,12 +67,20 @@ class Predict:
         #datasets
         cubeio = cio.CubeIO()
         cube = cubeio.load(cube_name=cube_name, type='processed')
-        cube_rf = cube.cube_rf.reshape(-1, *(cube.cube_rf.shape[2:]))
-        cube_lat = cube.lat.reshape(-1, *(cube.lat.shape[2:]))
-        cube_lon = cube.lon.reshape(-1, *(cube.lon.shape[2:]))
-        cube_lam = cube.lam
-        spectra_num = cube_rf.shape[0]
+        cube_rf = cube.cube_rf.reshape(-1, *(cube.cube_rf.shape[2:])) # type: ignore
+        cube_lat = cube.lat.reshape(-1, *(cube.lat.shape[2:])) # type: ignore
+        cube_lon = cube.lon.reshape(-1, *(cube.lon.shape[2:])) # type: ignore
+        cube_lam = cube.lam # type: ignore
+        # spectra_num = cube_rf.shape[0]
+        spectra_num = 4
         Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
+        lats = np.zeros([spectra_num], dtype=float)
+        lons = np.zeros([spectra_num], dtype=float)
+        class_x1s = np.zeros([spectra_num], dtype=float)
+        class_x2s = np.zeros([spectra_num], dtype=float)
+        regs = np.zeros([spectra_num], dtype=float)
+        lats = cube_lat[range(spectra_num)] #
+        lons = cube_lon[range(spectra_num)] #
         for i in range(spectra_num):
             Myinput[i] = get3c(cube_rf[i], cube_lam)
             cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'DEBUG')
@@ -151,11 +121,22 @@ class Predict:
         criterion = nn.BCEWithLogitsLoss().cuda()
 
         # evaluate on test set
-        self. test(Myinput, model, criterion)
+        y_pred = self. _test(Myinput, model, criterion)
+        y_pred = np.array(y_pred)
+        class_x1s = y_pred[:,0,0,0]
+        class_x2s = y_pred[:,0,0,1]
+
+        predicted = cio.Predicted()
+        predicted.points = np.column_stack([lats, lons, class_x1s, class_x2s, regs])
+
+        #save
+        predicted_path=os.path.join(config.py_path, 'predicted', f'{cube_name}_predicted.npz')
+        cio.save_Predicted(predicted_cube=predicted, filepath=predicted_path)
+        return predicted
 
 
 
-    def test(self, target_data, model, criterion):
+    def _test(self, target_data, model, criterion):
         """Perform validation on the validation set"""
         batch_time = AverageMeter()
         losses = AverageMeter()
@@ -166,6 +147,7 @@ class Predict:
         total_correct = 0
         total_num = 0
 
+        
 
         # switch to evaluate mode
         model.eval()
@@ -212,6 +194,12 @@ class Predict:
             
             # measure metrics
             output1 = output.cpu()
+            output_reg = np.maximum(output1.detach().numpy(),0)
+            output_class = np.argmax(output1.detach().numpy(), axis=1)
+            cio.log("Predict", f"output1: {output1}", "DEBUG")
+            cio.log("Predict", f"output_reg: {output_reg}", "DEBUG")
+            cio.log("Predict", f"output_class: {output_class}", "DEBUG")
+
 
             #reg
             # output1 = np.maximum(output1.detach().numpy(),0)
@@ -224,7 +212,8 @@ class Predict:
                 # index=False,
                 # engine='openpyxl')
 
-            y_pred.extend(output1.tolist())
+            y_pred.extend(output1.detach().numpy())
+        return y_pred
 
 
 

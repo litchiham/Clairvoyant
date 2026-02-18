@@ -13,7 +13,7 @@ import omegapy.omega_plots as op
 import os
 import time
 import tkinter.messagebox as messagebox
-import predict
+import numpy as np
 from typing import Literal
 
 
@@ -51,6 +51,60 @@ def log(source:str,message:str, type: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR
             #此处有问题，messagebox可能阻塞线程
             messagebox.showinfo(title=type, message=message)
 
+class Predicted:
+    '''存储和一个cube的预测结果'''
+    
+    def __init__(self, points_array=None):
+        """
+        初始化预测结果对象
+        
+        参数:
+        points_array: numpy数组，形状为(n, 5)，每行代表一个点
+        [lon, lat, classification_x1, classification_x2, reg]
+        """
+        if points_array is None:
+            self.points = np.empty((0, 5))  # 创建空的5列数组
+        else:
+            self.points = np.array(points_array, dtype=float)
+
+
+    def get(self, key):
+        if len(self.points) == 0:
+            return np.array([])
+            
+        key_map = {
+            'lon': 0,
+            'lat': 1, 
+            'class_x1': 2,
+            'class_x2': 3,
+            'reg': 4
+        }
+        
+        if key not in key_map:
+            raise ValueError(f"不支持的key: {key}")
+            
+        col_idx = key_map[key]
+        return self.points[:, col_idx]
+    
+    # 一些辅助方法
+    def append(self, point):
+        self.points = np.append(self.points, point, axis=0)
+    def to_array(self):
+        return self.points
+    
+def save_Predicted(predicted_cube, filepath, format='npz'):
+    if format == 'npz':
+        np.savez(filepath, points=predicted_cube.points)
+    elif format == 'pkl':
+        import pickle
+        with open(filepath, 'wb') as f:
+            pickle.dump(predicted_cube, f)
+
+
+def load_Predicted(filepath, format='npz'):
+    if format == 'npz':
+        data = np.load(filepath)
+        return Predicted(points_array=data['points'])
 # CubeIO 类：OMEGA数据输入输出管理器
 # 功能：统一管理OMEGA数据的加载、存储和路径配置
 # 该类提供对原始二进制数据、处理后的Python数据和预测结果的统一访问接口
@@ -155,7 +209,7 @@ class CubeIO:
             elif type == 'processed':
                 source_path = os.path.join(self._base_py_path,'processed', f'{cube_name}_processed.pkl')
             elif type == 'predicted':
-                source_path = os.path.join(self._base_py_path,'predicted', f'{cube_name}_predicted.pkz')
+                source_path = os.path.join(self._base_py_path,'predicted', f'{cube_name}_predicted.npz')
             else:
                 raise ValueError(f'无效的类型: {type}')
             
@@ -222,8 +276,7 @@ class CubeIO:
     # 注意：此方法当前为临时实现，需要根据实际的predict模块进行完善
     def _load_predicted(self, buffer_target:str):
         log('CubeIO._load_predicted', f'开始加载立方体 {buffer_target}，类型 predicted', 'DEBUG')
-        ret4test=predict.Predicted() ##暂时留空
-        return ret4test
+        return load_Predicted(buffer_target)
 # 主程序入口：用于测试CubeIO类功能的示例代码
 # 当直接运行此文件时执行，不作为模块导入时跳过
 if __name__ == '__main__':
