@@ -4,10 +4,14 @@ from pathlib import Path
 import os
 import glob
 import threading
+import time
+import process
+import cubeio as cio
+from config import *
 class TkinterGui():
-    def __init__(self):
-        self.root=tk.Tk()
-        self.root.title('gui_v0.1')
+    def __init__(self,root):
+        self.root=root
+        self.root.title('gui_v0.2')
         self.root.geometry('700x500')
 
         # 设置样式
@@ -19,8 +23,12 @@ class TkinterGui():
         # 创建标签页（Notebook）容器
         self.create_notebook()
         
-        # 创建状态栏
-        #self.create_statusbar()
+        # 创建路径栏
+        self.bin_path=tk.StringVar(value=config.bin_path)
+        self.py_path=tk.StringVar(value=config.py_path)
+        self.buffer_path=tk.StringVar(value=config.buffer_path)
+        self.dust_path=tk.StringVar(value=config.dust_path)
+        self.create_pathbar()
 
     def setup_styles(self):
         '''设置控件样式'''
@@ -59,7 +67,7 @@ class TkinterGui():
         """创建标签页容器"""
         # 创建Notebook（标签页控件）
         notebook = ttk.Notebook(self.main_frame)
-        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N),pady=(0,10))
         
         # 创建各个标签页
         self.create_preprocessing_tab(notebook)
@@ -91,25 +99,25 @@ class TkinterGui():
             frame.columnconfigure(i, weight=1)
 
         # 导入按钮
-        button_import = ttk.Button(frame, text="选择Cube",command=self.select_import0)
+        button_import = ttk.Button(frame, text="选择Cube",command=self.select_import0,state=tk.DISABLED)
         button_import.grid(row=0, column=0, sticky=tk.W, padx=5)
         # 显示当前文件路径
         self.file_label_preprocessing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_preprocessing.grid(row=1,column=0,sticky=tk.W,padx=5)
         # 开始按钮
-        button_process = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.DISABLED)
+        button_process = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.NORMAL)
         button_process.grid(row=0,column=1,sticky=tk.W,padx=5)   
         # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.select_export0)
+        button_export = ttk.Button(frame, text="导出为...",command=self.select_export0,state=tk.DISABLED)
         button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)
         # 显示按钮
-        button_show = ttk.Button(frame, text="显示",command=self.show0,state=tk.DISABLED)
+        button_show = ttk.Button(frame, text="显示",command=self.show0,state=tk.NORMAL)
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)
 
         # 进度条
         self.progress_var = tk.DoubleVar()
-        progressbar = ttk.Progressbar(frame, variable=self.progress_var,length=300)
-        progressbar.grid(row=0,column=2,sticky=tk.W)      
+        self.progressbar0 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
+        self.progressbar0.grid(row=0,column=2,sticky=tk.W)      
 
     def create_predicting_tab(self,notebook):
         """创建预测标签页"""
@@ -121,26 +129,26 @@ class TkinterGui():
             frame.columnconfigure(i, weight=1)
 
         # 导入按钮
-        button_import = ttk.Button(frame, text="选择Cube",command=self.button_clicked_example)
+        button_import = ttk.Button(frame, text="选择Cube",command=self.button_clicked_example,state=tk.DISABLED)
         button_import.grid(row=0, column=0, sticky=tk.W, padx=5)
         # 显示当前文件路径
         self.file_label_predicting = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_predicting.grid(row=1,column=0,sticky=tk.W,padx=5)
 
         # 处理按钮
-        button_process = ttk.Button(frame,text="开始预测",command=self.button_clicked_example)
+        button_process = ttk.Button(frame,text="开始预测",command=self.process1)
         button_process.grid(row=0,column=1,sticky=tk.W,padx=5)  
         # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example)
+        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example,state=tk.DISABLED)
         button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)  
         # 显示按钮
         button_show = ttk.Button(frame, text="显示",command=self.button_clicked_example)
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)  
 
         # 进度条
-        self.progress_var = tk.DoubleVar()
-        progressbar = ttk.Progressbar(frame, variable=self.progress_var,length=300)
-        progressbar.grid(row=0,column=2,sticky=tk.W)                
+        self.predict_var = tk.DoubleVar()
+        self.progressbar1 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
+        self.progressbar1.grid(row=0,column=2,sticky=tk.W)                
 
     def create_visualizing_tab(self,notebook):
         """创建可视化标签页"""
@@ -152,14 +160,14 @@ class TkinterGui():
             frame.columnconfigure(i, weight=1)
 
         # 导入按钮
-        button_import = ttk.Button(frame, text="导入结果",command=self.button_clicked_example)
+        button_import = ttk.Button(frame, text="导入结果",command=self.button_clicked_example,state=tk.DISABLED)
         button_import.grid(row=0, column=0, sticky=tk.W, padx=5)  
         # 显示当前文件路径
         self.file_label_visualizing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_visualizing.grid(row=0,column=1,sticky=tk.W,padx=5)
 
         # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example)
+        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example,state=tk.DISABLED)
         button_export.grid(row=1, column=0, sticky=tk.W, padx=5,pady=5)  
         # 显示按钮
         button_show = ttk.Button(frame, text="显示",command=self.button_clicked_example)
@@ -167,9 +175,48 @@ class TkinterGui():
 
         # 进度条
         self.progress_var = tk.DoubleVar()
-        progressbar = ttk.Progressbar(frame, variable=self.progress_var,length=300)
-        progressbar.grid(row=0,column=2,sticky=tk.W) 
+        progressbar2 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
+        progressbar2.grid(row=0,column=2,sticky=tk.W) 
 
+    def create_pathbar(self):
+        pathbar = ttk.LabelFrame(self.main_frame, text="工作路径")
+        pathbar.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 100))
+
+        pathbar.columnconfigure(0, weight=1)
+
+        frame = ttk.Frame(pathbar, padding=10)
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
+
+        for i in range(6):
+            frame.columnconfigure(i, weight=1)
+
+        bin_path_label = ttk.Label(frame, text="bin_path", style='Status.TLabel')
+        bin_path_label.grid(row=0, column=0, sticky=tk.W,padx=10)
+        self.bin_path_bar = tk.Label(frame,textvariable=self.bin_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
+        self.bin_path_bar.grid(row=0,column=1,sticky=tk.W)
+        bin_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path0)
+        bin_path_btn.grid(row=0,column=2)
+
+        py_path_label = ttk.Label(frame, text="py_path", style='Status.TLabel')
+        py_path_label.grid(row=1, column=0, sticky=tk.W,padx=10)
+        self.py_path_bar = tk.Label(frame,textvariable=self.py_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
+        self.py_path_bar.grid(row=1,column=1,sticky=tk.W)
+        py_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path1)
+        py_path_btn.grid(row=1,column=2)
+
+        buffer_path_label = ttk.Label(frame, text="buffer_path", style='Status.TLabel')
+        buffer_path_label.grid(row=2, column=0, sticky=tk.W,padx=10)
+        self.buffer_path_bar = tk.Label(frame,textvariable=self.buffer_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
+        self.buffer_path_bar.grid(row=2,column=1,sticky=tk.W)
+        buffer_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path2)
+        buffer_path_btn.grid(row=2,column=2)
+
+        dust_path_label = ttk.Label(frame, text="dust_path", style='Status.TLabel')
+        dust_path_label.grid(row=3, column=0, sticky=tk.W,padx=10)
+        self.dust_path_bar = tk.Label(frame,textvariable=self.dust_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
+        self.dust_path_bar.grid(row=3,column=1,sticky=tk.W)
+        dust_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path3)
+        dust_path_btn.grid(row=3,column=2)
     # 事件处理方法
     def button_clicked_example(self):
         """按钮点击事件处理"""
@@ -189,8 +236,14 @@ class TkinterGui():
             self.file_label_preprocessing.configure(text="未选择Cube", foreground='gray')
     def select_export0(self):
         pass
-    def process0(self):
-        pass
+    def process0(self):    
+        def t():
+            self.progrebar['mode']='indeterminate'
+            self.progressbar0.start(10)
+            time.sleep(3)#任务模拟
+            self.progressbar0.stop()
+            self.progressbar0['mode']='determinate'
+        threading.Thread(target=t).start()     
     def show0(self):
         pass
     def extract_cube_names(self,folder):
@@ -207,7 +260,13 @@ class TkinterGui():
     def select_export1(self):
         pass
     def process1(self):
-        pass
+        def t():
+            self.progressbar1['mode']='indeterminate'
+            self.progressbar1.start(10)
+            time.sleep(3)#任务模拟
+            self.progressbar1.stop()
+            self.progressbar1['mode']='determinate'
+        threading.Thread(target=t).start()
     def show1(self):
         pass
 
@@ -217,12 +276,34 @@ class TkinterGui():
         pass
     def show2(self):
         pass
-
+    
+##########
+    def select_path0(self):
+        folder=filedialog.askdirectory(title='请选择路径')
+        if folder:
+            config.bin_path=folder
+            self.bin_path.set(folder)
+    def select_path1(self):
+        folder=filedialog.askdirectory(title='请选择路径')
+        if folder:
+            config.py_path=folder
+            self.py_path.set(folder)
+    def select_path2(self):
+        folder=filedialog.askdirectory(title='请选择路径')
+        if folder:
+            config.buffer_path=folder
+            self.buffer_path.set(folder)
+    def select_path3(self):
+        folder=filedialog.askdirectory(title='请选择路径')
+        if folder:
+            config.dust_path=folder
+            self.dust_path.set(folder)
 
 def main():
     """主函数"""
-    app = TkinterGui()
-    app.root.mainloop()
+    root=tk.Tk()
+    app = TkinterGui(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
