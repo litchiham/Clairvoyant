@@ -21,7 +21,7 @@ class Args:
         self.resume = 'model_best.pth.tar'
         self.name = 'SCANet'
         self.tensorboard = False
-        self.data = 'Mn'
+        self.data = 'Mn_dl'
         self.lr = 0.1
 
 args = Args()
@@ -35,10 +35,7 @@ class Predict:
     best_auroc = 0
     best_sen = 0
     best_spe = 0
-    _base_py_path=''
     def __init__(self):
-        self._base_py_path = config.py_path
-        self._base_buffer_path = config.buffer_path
         cio.log('Process', 'Initialization', 'INFO')
     def predict_cube(self, cube_name):
         global args
@@ -47,25 +44,20 @@ class Predict:
         # Data loading code
         kwargs = {'num_workers': 8, 'pin_memory': True}       
         #datasets
-        cubeio = cio.CubeIO()
-        cube = cubeio.load(cube_name=cube_name, type='processed')
+        cube = cio.cubeio.load(cube_name=cube_name, type='processed')
         cube_rf = cube.cube_rf.reshape(-1, *(cube.cube_rf.shape[2:])) # type: ignore
-        cube_lat = cube.lat.reshape(-1, *(cube.lat.shape[2:])) # type: ignore
-        cube_lon = cube.lon.reshape(-1, *(cube.lon.shape[2:])) # type: ignore
+        
         cube_lam = cube.lam # type: ignore
-        # spectra_num = cube_rf.shape[0]
-        spectra_num = 4
+        spectra_num = cube_rf.shape[0]
         Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
-        lats = np.zeros([spectra_num], dtype=float)
-        lons = np.zeros([spectra_num], dtype=float)
         class_x1s = np.zeros([spectra_num], dtype=float)
         class_x2s = np.zeros([spectra_num], dtype=float)
         regs = np.zeros([spectra_num], dtype=float)
-        lats = cube_lat[range(spectra_num)] #
-        lons = cube_lon[range(spectra_num)] #
+        lats = cube.lat.reshape(-1, *(cube.lat.shape[2:])) # type: ignore
+        lons = cube.lon.reshape(-1, *(cube.lon.shape[2:])) # type: ignore
         for i in range(spectra_num):
             Myinput[i] = get3c(cube_rf[i], cube_lam)
-            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'DEBUG')
+            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'INFO')
 
         # create model
         if args.data == 'Mn':
@@ -290,8 +282,10 @@ def get3c(intensity,wavelengths):
     return Myinput
 
 if __name__ == '__main__':
+    config.log_level='INFO'
     predict=Predict()
-    predict.predict_cube('0982_3')
+    predicted = predict.predict_cube('0982_3')
+
         
     
     
