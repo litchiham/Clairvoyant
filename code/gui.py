@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import glob
 import threading
+import queue
 import time
 import process
 import cubeio as cio
@@ -29,6 +30,12 @@ class TkinterGui():
         self.buffer_path=tk.StringVar(value=config.buffer_path)
         self.dust_path=tk.StringVar(value=config.dust_path)
         self.create_pathbar()
+
+        # 创建队列
+        self.q0=queue.Queue()
+        self.q1=queue.Queue()
+        self.q2=queue.Queue()
+        self.poll()
 
     def setup_styles(self):
         '''设置控件样式'''
@@ -105,8 +112,8 @@ class TkinterGui():
         self.file_label_preprocessing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_preprocessing.grid(row=1,column=0,sticky=tk.W,padx=5)
         # 开始按钮
-        button_process = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.NORMAL)
-        button_process.grid(row=0,column=1,sticky=tk.W,padx=5)   
+        self.button_process0 = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.NORMAL)
+        self.button_process0.grid(row=0,column=1,sticky=tk.W,padx=5)   
         # 导出按钮
         button_export = ttk.Button(frame, text="导出为...",command=self.select_export0,state=tk.DISABLED)
         button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)
@@ -115,7 +122,7 @@ class TkinterGui():
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)
 
         # 进度条
-        self.progress_var = tk.DoubleVar()
+        self.progress_var = tk.IntVar(value=0)
         self.progressbar0 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
         self.progressbar0.grid(row=0,column=2,sticky=tk.W)      
 
@@ -136,8 +143,8 @@ class TkinterGui():
         self.file_label_predicting.grid(row=1,column=0,sticky=tk.W,padx=5)
 
         # 处理按钮
-        button_process = ttk.Button(frame,text="开始预测",command=self.process1)
-        button_process.grid(row=0,column=1,sticky=tk.W,padx=5)  
+        self.button_process1 = ttk.Button(frame,text="开始预测",command=self.process1)
+        self.button_process1.grid(row=0,column=1,sticky=tk.W,padx=5)  
         # 导出按钮
         button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example,state=tk.DISABLED)
         button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)  
@@ -146,8 +153,8 @@ class TkinterGui():
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)  
 
         # 进度条
-        self.predict_var = tk.DoubleVar()
-        self.progressbar1 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
+        self.predict_var = tk.IntVar(value=0)
+        self.progressbar1 = ttk.Progressbar(frame, variable=self.predict_var,length=300)
         self.progressbar1.grid(row=0,column=2,sticky=tk.W)                
 
     def create_visualizing_tab(self,notebook):
@@ -174,8 +181,8 @@ class TkinterGui():
         button_show.grid(row=1, column=1, sticky=tk.W, padx=5,pady=5)  
 
         # 进度条
-        self.progress_var = tk.DoubleVar()
-        progressbar2 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
+        self.visual_var = tk.IntVar(value=0)
+        progressbar2 = ttk.Progressbar(frame, variable=self.visual_var,length=300)
         progressbar2.grid(row=0,column=2,sticky=tk.W) 
 
     def create_pathbar(self):
@@ -236,14 +243,20 @@ class TkinterGui():
             self.file_label_preprocessing.configure(text="未选择Cube", foreground='gray')
     def select_export0(self):
         pass
-    def process0(self):    
-        def t():
-            self.progrebar['mode']='indeterminate'
-            self.progressbar0.start(10)
-            time.sleep(3)#任务模拟
-            self.progressbar0.stop()
-            self.progressbar0['mode']='determinate'
-        threading.Thread(target=t).start()     
+    def process0(self):   
+        if getattr(self, '_running0', False):
+            return 
+        self.cube_names[0]=self.extract_cube_names(config.bin_path)
+        def f(callback=None):
+            p = process.Process()
+            p.import_cubes(self.cube_names[0])
+            p.process_cubes(callback=callback)
+            cio.log('Process', 'Processing completed.', 'INFO')            
+        self.progress_var.set(0)
+        self.button_process0.config(state='disabled')
+        self.progressbar0.config(maximum=len(self.cube_names[0]))
+        self._running0 = True
+        threading.Thread(target=self._worker, args=(f,self.q0), daemon=True).start()
     def show0(self):
         pass
     def extract_cube_names(self,folder):
@@ -298,6 +311,53 @@ class TkinterGui():
         if folder:
             config.dust_path=folder
             self.dust_path.set(folder)
+
+    def poll(self):
+        self.poll0()
+        #self.poll1()
+    def poll0(self):
+        try:
+            while True:
+                item = self.q0.get_nowait()
+                if item == 'done':
+                    self._running0 = False
+                    self.button_process0.config(state='normal')
+                elif isinstance(item, tuple) and item[0] == 'err':
+                    messagebox.showerror('Error', item[1])
+                    self._running0 = False
+                    self.button_process0.config(state='normal')
+                else:
+                    self.progress_var.set(min(len(self.cube_names[0]), self.progress_var.get() + int(item)))
+        except queue.Empty:
+            pass
+        self.root.after(100, self.poll0)
+    def poll1(self):
+        try:
+            while True:
+                item = self.q1.get_nowait()
+                if item == 'done':
+                    self._running1 = False
+                    self.button_process1.config(state='normal')
+                elif isinstance(item, tuple) and item[0] == 'err':
+                    messagebox.showerror('Error', item[1])
+                    self._running1 = False
+                    self.button_process1.config(state='normal')
+                else:
+                    self.predict_var.set(min(len(self.cube_names[1]), self.predict_var.get() + int(item)))
+        except queue.Empty:
+            pass
+        self.root.after(100, self.poll1)   
+
+    def _worker(self,f,q):
+        def cb(_result):
+            q.put(1)
+
+        try:
+            f(callback=cb)
+        except Exception as e:
+            q.put(('err', str(e)))
+        finally:
+            q.put('done') 
 
 def main():
     """主函数"""

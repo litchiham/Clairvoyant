@@ -261,7 +261,7 @@ class Process:
             cio.log('Clean', str(e), 'ERROR')
             return cube
     # ====== 主流程 ======
-    def _process_all_parallel(self, max_workers=1):
+    def _process_all_parallel(self, max_workers=1,callback=None):
         cio.log('Process', f"Found {len(self.cube_names)} OMEGA folders", 'INFO')
 
         #稍后需要与GUI同步修改
@@ -272,7 +272,9 @@ class Process:
                 result = f.result()
                 if result:
                     cio.log('Process', 'Successfully processed: ' + result, 'INFO')
-    def process_cubes(self, save=True, atm_corr=True, therm_corr=True):
+                    if callback:
+                        callback(result)
+    def process_cubes(self, save=True, atm_corr=True, therm_corr=True,callback=None):
         cio.log('Process', 'Processing cubes...', 'DEBUG')
         # ====== 预加载 dust 数据，并统一坐标 ======
         dust_paths = os.path.join(self._dust_file_path, '*.nc')
@@ -289,7 +291,7 @@ class Process:
             except Exception as e:
                 cio.log('Process', 'Failed to load ' + f + ': ' + str(e), 'ERROR')
         cio.log('Process', 'Loaded ' + str(len(self._dust_datasets)) + ' dust datasets.', 'INFO')
-        self._process_all_parallel()
+        self._process_all_parallel(callback=callback)
         
 if __name__ == "__main__":
     process = Process()
