@@ -272,8 +272,13 @@ class Process:
                 result = f.result()
                 if result:
                     cio.log('Process', 'Successfully processed: ' + result, 'INFO')
-                    if callback:
+                else:
+                    cio.log('Process', 'Processing returned no result for a cube', 'INFO')
+                if callback:
+                    try:
                         callback(result)
+                    except Exception as e:
+                        cio.log('Process', 'Callback raised exception: ' + str(e), 'ERROR')
     def process_cubes(self, save=True, atm_corr=True, therm_corr=True,callback=None):
         cio.log('Process', 'Processing cubes...', 'DEBUG')
         # ====== 预加载 dust 数据，并统一坐标 ======

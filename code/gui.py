@@ -10,7 +10,7 @@ import process
 import cubeio as cio
 from config import *
 class TkinterGui():
-    def __init__(self,root):
+    def __init__(self,root:tk.Tk):
         self.root=root
         self.root.title('gui_v0.2')
         self.root.geometry('700x500')
@@ -34,7 +34,6 @@ class TkinterGui():
         # 创建队列
         self.q0=queue.Queue()
         self.q1=queue.Queue()
-        self.q2=queue.Queue()
         self.poll()
 
     def setup_styles(self):
@@ -124,7 +123,9 @@ class TkinterGui():
         # 进度条
         self.progress_var = tk.IntVar(value=0)
         self.progressbar0 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
-        self.progressbar0.grid(row=0,column=2,sticky=tk.W)      
+        self.progressbar0.grid(row=0,column=2,sticky=tk.W)    
+        self.progressbar0_label=ttk.Label(frame,text='',style='Status.TLabel')  
+        self.progressbar0_label.grid(row=0,column=3)
 
     def create_predicting_tab(self,notebook):
         """创建预测标签页"""
@@ -328,6 +329,7 @@ class TkinterGui():
                     self.button_process0.config(state='normal')
                 else:
                     self.progress_var.set(min(len(self.cube_names[0]), self.progress_var.get() + int(item)))
+                    self.progressbar0_label.config(text=f'{self.progress_var.get()}/{len(self.cube_names[0])}')
         except queue.Empty:
             pass
         self.root.after(100, self.poll0)
