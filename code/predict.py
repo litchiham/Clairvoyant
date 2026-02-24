@@ -4,6 +4,8 @@ import warnings
 warnings.filterwarnings('ignore')
 import cubeio as cio
 from config import *
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import torch
 import torch.nn as nn
@@ -37,12 +39,18 @@ class Predict:
     best_spe = 0
     def __init__(self):
         cio.log('Process', 'Initialization', 'INFO')
-    def predict_cube(self, cube_name):
+    def predict_single(self, cube_name):
         global args
         # if args.tensorboard: configure("runs/%s"%(args.name))
         
         # Data loading code
         kwargs = {'num_workers': 8, 'pin_memory': True}       
+
+        #skip if predicted
+        if os.path.exists(f'{config.py_path}/predicted/{cube_name}_predicted.npz'):
+            cio.log(source='Predict', message=f'skip because {cube_name} is already predicted', type='INFO')
+            return
+
         #datasets
         cube = cio.cubeio.load(cube_name=cube_name, type='processed')
         cube_rf = cube.cube_rf.reshape(-1, *(cube.cube_rf.shape[2:])) # type: ignore
@@ -57,7 +65,7 @@ class Predict:
         lons = cube.lon.reshape(-1, *(cube.lon.shape[2:])) # type: ignore
         for i in range(spectra_num):
             Myinput[i] = get3c(cube_rf[i], cube_lam)
-            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'INFO')
+            cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'INFO', flush = True)
 
         # create model
         if args.data == 'Mn':
@@ -107,6 +115,17 @@ class Predict:
         predicted_path=os.path.join(config.py_path, 'predicted', f'{cube_name}_predicted.npz')
         cio.save_Predicted(predicted_cube=predicted, filepath=predicted_path)
         return predicted
+    
+    def predict_cubes(self, cube_names, max_workers=1):
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(self.predict_single, cube_name) for cube_name in cube_names]
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    # print(f"Predicted for cube: {result}")
+                except Exception as e:
+                    print(f"Error occurred while predicting for cube: {e}")
+                
 
 
 
@@ -170,9 +189,7 @@ class Predict:
             output1 = output.cpu()
             output_reg = np.maximum(output1.detach().numpy(),0)
             output_class = np.argmax(output1.detach().numpy(), axis=1)
-            cio.log("Predict", f"output1: {output1}", "DEBUG")
-            cio.log("Predict", f"output_reg: {output_reg}", "DEBUG")
-            cio.log("Predict", f"output_class: {output_class}", "DEBUG")
+            
 
 
             #reg
@@ -284,7 +301,7 @@ def get3c(intensity,wavelengths):
 if __name__ == '__main__':
     config.log_level='INFO'
     predict=Predict()
-    predicted = predict.predict_cube('0982_3')
+    predicted = predict.predict_cubes(cube_names=['0982_3', '4238_4'], max_workers=2)
 
         
     

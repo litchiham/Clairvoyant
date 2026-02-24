@@ -26,11 +26,14 @@ _log_levels={
     'ERROR':3
 }
 # 日志记录函数
-def log(source:str,message:str, type: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'], show_in_window=False):
+def log(source:str,message:str, type: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'], show_in_window=False, flush = False):
     if(_log_levels[type] >= _log_levels[config.log_level]):
         time_stamp = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime())
         log_str = f"{time_stamp} [{type}] @{source}: {message}"
-        print(log_str)
+        if(flush):
+            print(log_str,end = '\r', flush=True)
+        else:
+            print(log_str)
         if(show_in_window):
             #此处有问题，messagebox可能阻塞线程
             messagebox.showinfo(title=type, message=message)
