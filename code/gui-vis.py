@@ -15,14 +15,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
+import cubeio as cio
 
-# 尝试导入 omegapy
-try:
-    import omegapy.omega_data as od
-    OMEGAPY_AVAILABLE = True
-except ImportError:
-    OMEGAPY_AVAILABLE = False
-    print("警告：omegapy 未安装，将使用模拟数据")
+import omegapy.omega_data as od
+OMEGAPY_AVAILABLE = True
+
 
 class SpectrumWindow:
     """光谱显示窗口，管理0.8-2.4um波段反射率折线图的显示"""
@@ -191,7 +188,7 @@ class SimpleSphereViewer:
         # 左侧栏相关属性
         self.file_listbox = None
         self.processed_files = []  # 存储检测到的文件列表
-        self.cubeio = None  # CubeIO实例
+        cio.cubeio = None  # CubeIO实例
         
         # 创建界面
         self.create_widgets()
@@ -206,7 +203,7 @@ class SimpleSphereViewer:
             from cubeio import CubeIO
             
             # 创建CubeIO实例
-            self.cubeio = CubeIO()
+            cio.cubeio = CubeIO()
             
             # 扫描processed目录
             self.scan_processed_files()
@@ -368,13 +365,10 @@ class SimpleSphereViewer:
         self.root.update()
         
         try:
-            # 使用CubeIO加载processed数据
-            if self.cubeio is None:
-                from cubeio import CubeIO
-                self.cubeio = CubeIO()
+            
             
             # 加载processed类型的数据
-            self.data = self.cubeio.load(cube_name=cube_name, type='processed')
+            self.data = cio.cubeio.load(cube_name=cube_name, type='processed')
             
             # 更新状态
             self.status_label.config(text=f"已加载: {cube_name}")
@@ -403,67 +397,6 @@ class SimpleSphereViewer:
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
-    def load_pkl(self, filepath=None):
-        """使用 omegapy 加载 pkl 文件
-        
-        Args:
-            filepath: pkl 文件路径，如果为 None 则打开文件对话框
-        """
-        if filepath is None:
-            filepath = filedialog.askopenfilename(
-                title="Select PKL File",
-                filetypes=[("PKL files", "*.pkl"), ("All files", "*.*")]
-            )
-            if not filepath:
-                return
-                
-        self.status_label.config(text=f"Loading PKL file: {filepath}")
-        self.root.update()
-        
-        try:
-            if not OMEGAPY_AVAILABLE:
-                # 用于测试的模拟数据
-                self.data = {
-                    "filepath": filepath,
-                    "cube_rf": np.random.rand(100, 100, 256),  # 模拟反射率
-                    "lat": np.random.rand(100, 100) * 180 - 90,  # 纬度 -90 到 90
-                    "lon": np.random.rand(100, 100) * 360 - 180,  # 经度 -180 到 180
-                    "lam": np.linspace(0.35, 5.1, 256),  # 波长
-                    "message": "Simulated data (omegapy not installed)"
-                }
-                self.status_label.config(text="PKL file loaded (simulated data)")
-                print("load_pkl: Using simulated data (omegapy not installed)")
-                return
-                
-            # 使用 omegapy 加载数据
-            # 根据文档，使用 load_omega 函数加载 pkl 文件
-            self.data = od.load_omega(filepath)
-            
-            # 打印数据信息
-            print(f"load_pkl: Data loaded successfully")
-            
-            # 检查数据是否具有 lat/lon 属性
-            if hasattr(self.data, 'lat') and hasattr(self.data, 'lon'):
-                # 对于 OMEGAdata 对象，lat 和 lon 可能是 2D 数组
-                lat_data = self.data.lat
-                lon_data = self.data.lon
-                print(f"  Latitude range: {lat_data.min():.2f} to {lat_data.max():.2f}")
-                print(f"  Longitude range: {lon_data.min():.2f} to {lon_data.max():.2f}")
-            else:
-                print("  Warning: lat/lon attributes not found in data")
-            
-            if hasattr(self.data, 'cube_rf'):
-                print(f"  Reflectance shape: {self.data.cube_rf.shape}")
-            
-            self.status_label.config(text="PKL file loaded successfully")
-            
-        except FileNotFoundError as e:
-            self.status_label.config(text=f"File not found: {filepath}")
-            print(f"load_pkl error: File not found - {e}")
-        except Exception as e:
-            self.status_label.config(text=f"Load failed: {e}")
-            print(f"load_pkl error: {e}")
-            
     def create_sphere(self):
         """使用 matplotlib 3D 创建球体"""
         self.status_label.config(text="Creating sphere...")
