@@ -116,13 +116,25 @@ class Predict:
         cio.save_Predicted(predicted_cube=predicted, filepath=predicted_path)
         return predicted
     
-    def predict_cubes(self, cube_names, max_workers=1):
+    def predict_cubes(self, cube_names, max_workers=1, callback=None):
+        """Predict multiple cubes in parallel.
+
+        Args:
+            cube_names: list of cube name strings.
+            max_workers: number of threads.
+            callback: optional function called with the result of each cube
+                prediction; used by GUI to update progress.
+        """
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(self.predict_single, cube_name) for cube_name in cube_names]
+            futures = {executor.submit(self.predict_single, cube_name): cube_name for cube_name in cube_names}
             for future in as_completed(futures):
                 try:
                     result = future.result()
-                    # print(f"Predicted for cube: {result}")
+                    if callback:
+                        try:
+                            callback(result)
+                        except Exception as e:
+                            print(f"Callback raised exception: {e}")
                 except Exception as e:
                     print(f"Error occurred while predicting for cube: {e}")
                 

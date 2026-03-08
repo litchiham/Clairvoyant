@@ -6,7 +6,10 @@ import glob
 import threading
 import queue
 import time
+import subprocess
+import sys
 import process
+import predict
 import cubeio as cio
 from config import *
 class TkinterGui():
@@ -104,18 +107,12 @@ class TkinterGui():
         for i in range(6):
             frame.columnconfigure(i, weight=1)
 
-        # 导入按钮
-        button_import = ttk.Button(frame, text="选择Cube",command=self.select_import0,state=tk.DISABLED)
-        button_import.grid(row=0, column=0, sticky=tk.W, padx=5)
         # 显示当前文件路径
         self.file_label_preprocessing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_preprocessing.grid(row=1,column=0,sticky=tk.W,padx=5)
         # 开始按钮
         self.button_process0 = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.NORMAL)
         self.button_process0.grid(row=0,column=1,sticky=tk.W,padx=5)   
-        # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.select_export0,state=tk.DISABLED)
-        button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)
         # 显示按钮
         button_show = ttk.Button(frame, text="显示",command=self.show0,state=tk.NORMAL)
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)
@@ -136,21 +133,14 @@ class TkinterGui():
         for i in range(6):
             frame.columnconfigure(i, weight=1)
 
-        # 导入按钮
-        button_import = ttk.Button(frame, text="选择Cube",command=self.button_clicked_example,state=tk.DISABLED)
-        button_import.grid(row=0, column=0, sticky=tk.W, padx=5)
         # 显示当前文件路径
         self.file_label_predicting = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_predicting.grid(row=1,column=0,sticky=tk.W,padx=5)
-
         # 处理按钮
         self.button_process1 = ttk.Button(frame,text="开始预测",command=self.process1)
         self.button_process1.grid(row=0,column=1,sticky=tk.W,padx=5)  
-        # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example,state=tk.DISABLED)
-        button_export.grid(row=2, column=0, sticky=tk.W, padx=5,pady=5)  
         # 显示按钮
-        button_show = ttk.Button(frame, text="显示",command=self.button_clicked_example)
+        button_show = ttk.Button(frame, text="显示",command=self.show1)
         button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)  
 
         # 进度条
@@ -167,24 +157,9 @@ class TkinterGui():
         for i in range(6):
             frame.columnconfigure(i, weight=1)
 
-        # 导入按钮
-        button_import = ttk.Button(frame, text="导入结果",command=self.button_clicked_example,state=tk.DISABLED)
-        button_import.grid(row=0, column=0, sticky=tk.W, padx=5)  
-        # 显示当前文件路径
-        self.file_label_visualizing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
-        self.file_label_visualizing.grid(row=0,column=1,sticky=tk.W,padx=5)
-
-        # 导出按钮
-        button_export = ttk.Button(frame, text="导出为...",command=self.button_clicked_example,state=tk.DISABLED)
-        button_export.grid(row=1, column=0, sticky=tk.W, padx=5,pady=5)  
         # 显示按钮
-        button_show = ttk.Button(frame, text="显示",command=self.button_clicked_example)
-        button_show.grid(row=1, column=1, sticky=tk.W, padx=5,pady=5)  
-
-        # 进度条
-        self.visual_var = tk.IntVar(value=0)
-        progressbar2 = ttk.Progressbar(frame, variable=self.visual_var,length=300)
-        progressbar2.grid(row=0,column=2,sticky=tk.W) 
+        self.button_show = ttk.Button(frame, text="显示",command=self.show_visualization)
+        self.button_show.grid(row=1, column=1, sticky=tk.W, padx=5,pady=5)  
 
     def create_pathbar(self):
         pathbar = ttk.LabelFrame(self.main_frame, text="工作路径")
@@ -242,6 +217,7 @@ class TkinterGui():
             self.file_label_preprocessing.configure(text=f'已选择{len(self.cube_names[0])}个Cube',foreground='black')
         else :
             self.file_label_preprocessing.configure(text="未选择Cube", foreground='gray')
+
     def select_export0(self):
         pass
     def process0(self):   
@@ -260,6 +236,12 @@ class TkinterGui():
         threading.Thread(target=self._worker, args=(f,self.q0), daemon=True).start()
     def show0(self):
         pass
+    def show_visualization(self):
+        """启动可视化窗口"""
+        try:
+            subprocess.Popen([sys.executable, 'code/gui-vis.py'])
+        except Exception as e:
+            messagebox.showerror("错误", f"无法启动可视化窗口: {e}")
     def extract_cube_names(self,folder):
         '''获取当前目录下所有 ORBxxxx_x_DATA 文件夹中的 xxxx_x 部分，并返回列表'''
         result = []
@@ -268,21 +250,60 @@ class TkinterGui():
             middle = str(name)[-11:-5]
             result.append(middle)
         return result
+    def extract_processed_cube_names(self, folder):
+        '''获取当前目录下所有 *_processed.pkl 文件中的 cube_name 部分，并返回列表'''
+        result = []
+        # 匹配所有以 _processed.pkl 结尾的文件
+        for name in glob.glob(str(Path(folder) / '*_processed.pkl')):
+            filename = os.path.basename(name)
+            if filename.endswith('_processed.pkl'):
+                cube_name = filename[:-len('_processed.pkl')]
+                result.append(cube_name)
+        return result
 
-    def select_import1(self):
-        pass
     def select_export1(self):
         pass
     def process1(self):
-        def t():
-            self.progressbar1['mode']='indeterminate'
-            self.progressbar1.start(10)
-            time.sleep(3)#任务模拟
-            self.progressbar1.stop()
-            self.progressbar1['mode']='determinate'
-        threading.Thread(target=t).start()
+        if getattr(self, '_running1', False):
+            return
+        if not self.cube_names[1]:
+            processed_dir = os.path.join(config.py_path, 'processed')
+            if os.path.exists(processed_dir):
+                self.cube_names[1] = self.extract_processed_cube_names(processed_dir)
+                self.file_label_predicting.configure(text=f'已选择{len(self.cube_names[1])}个Processed Cube', foreground='black')
+            else:
+                messagebox.showerror("错误", "processed目录不存在，请先处理数据")
+                return
+        if not self.cube_names[1]:
+            messagebox.showerror("错误", "没有找到processed cube")
+            return
+
+        # prepare progress tracking
+        self.predict_total = len(self.cube_names[1])
+        self.predict_count = 0
+        self.predict_var.set(0)
+        self.progressbar1.config(maximum=100, mode='determinate')
+        self.progressbar1['value'] = 0
+
+        def f():
+            p = predict.Predict()
+            p.predict_cubes(self.cube_names[1], max_workers=1, callback=self._predict_callback)
+            cio.log('Predict', 'Predicting completed.', 'INFO')
+
+        self.button_process1.config(state='disabled')
+        self._running1 = True
+        threading.Thread(target=self._worker_simple, args=(f, self.q1), daemon=True).start()
     def show1(self):
-        pass
+        predicted_dir = os.path.join(config.py_path, 'predicted')
+        if os.path.exists(predicted_dir):
+            files = os.listdir(predicted_dir)
+            if files:
+                file_list = '\n'.join(files)
+                messagebox.showinfo("预测结果", f"预测结果文件：\n{file_list}")
+            else:
+                messagebox.showinfo("预测结果", "predicted目录为空")
+        else:
+            messagebox.showerror("错误", "predicted目录不存在")
 
     def select_import2(self):
         pass 
@@ -315,7 +336,7 @@ class TkinterGui():
 
     def poll(self):
         self.poll0()
-        #self.poll1()
+        self.poll1()
     def poll0(self):
         try:
             while True:
@@ -344,8 +365,12 @@ class TkinterGui():
                     messagebox.showerror('Error', item[1])
                     self._running1 = False
                     self.button_process1.config(state='normal')
-                else:
-                    self.predict_var.set(min(len(self.cube_names[1]), self.predict_var.get() + int(item)))
+                elif isinstance(item, int):
+                    # progress increment
+                    self.predict_count += item
+                    percent = int(self.predict_count / self.predict_total * 100)
+                    self.predict_var.set(percent)
+                    self.progressbar1['value'] = percent
         except queue.Empty:
             pass
         self.root.after(100, self.poll1)   
@@ -359,7 +384,18 @@ class TkinterGui():
         except Exception as e:
             q.put(('err', str(e)))
         finally:
-            q.put('done') 
+            q.put('done')
+    def _worker_simple(self, f, q):
+        try:
+            f()
+        except Exception as e:
+            q.put(('err', str(e)))
+        finally:
+            q.put('done')
+
+    def _predict_callback(self, result):
+        # called from predict_cubes after each cube finishes
+        self.q1.put(1) 
 
 def main():
     """主函数"""
