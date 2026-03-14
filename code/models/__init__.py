@@ -1,2 +1,3 @@
-from .SCANet import *
+# from .SCANet import *
+from .ResNet import *
 

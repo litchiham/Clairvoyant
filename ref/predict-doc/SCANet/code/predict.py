@@ -153,7 +153,6 @@ def test(test_loader, model, criterion):
             # index=False,         
             # engine='openpyxl')   
 
-        y_pred.extend(output1.tolist())
 
 
 

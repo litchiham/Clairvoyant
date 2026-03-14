@@ -41,7 +41,7 @@ def log(source:str,message:str, type: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR
 class Predicted:
     '''存储和一个cube的预测结果'''
     
-    def __init__(self, points_array=None):
+    def __init__(self, lat = None, lon = None, reg = None):
         """
         初始化预测结果对象
         
@@ -50,49 +50,25 @@ class Predicted:
         [lon, lat, class_x1, class_x2, reg]
         可能更改
         """
-        if points_array is None:
-            self.points = np.empty((0, 5))  # 创建空的5列数组
+        if lat is None or lon is None or reg is None:
+            self.lat = np.empty(0)
+            self.lon = np.empty(0)
+            self.reg = np.empty(0)
         else:
-            self.points = np.array(points_array, dtype=float)
-
-
-    def get(self, key):
-        if len(self.points) == 0:
-            return np.array([])
-            
-        key_map = {
-            'lon': 0,
-            'lat': 1, 
-            'class_x1': 2,
-            'class_x2': 3,
-            'reg': 4
-        }
-        
-        if key not in key_map:
-            raise ValueError(f"不支持的key: {key}")
-            
-        col_idx = key_map[key]
-        return self.points[:, col_idx]
+            self.lat = np.array(lat)
+            self.lon = np.array(lon)
+            self.reg = np.array(reg)
     
-    # 一些辅助方法
-    def append(self, point):
-        self.points = np.append(self.points, point, axis=0)
-    def to_array(self):
-        return self.points
-    
-def save_Predicted(predicted_cube, filepath, format='npz'):
-    if format == 'npz':
-        np.savez(filepath, points=predicted_cube.points)
-    elif format == 'pkl':
-        import pickle
-        with open(filepath, 'wb') as f:
-            pickle.dump(predicted_cube, f)
+def save_Predicted(predicted_cube, filepath, format='pkl'):
+    import pickle
+    with open(filepath, 'wb') as f:
+        pickle.dump(predicted_cube, f)
 
 
-def load_Predicted(filepath, format='npz'):
-    if format == 'npz':
-        data = np.load(filepath)
-        return Predicted(points_array=data['points'])
+def load_Predicted(filepath, format='pkl'):
+    import pickle
+    with open(filepath, 'rb') as f:
+        return pickle.load(f)
     
 
 # CubeIO 类：OMEGA数据输入输出管理器
@@ -158,7 +134,7 @@ class CubeIO:
             elif type == 'processed':
                 source_path = os.path.join(config.py_path,'processed', f'{cube_name}_processed.pkl')
             elif type == 'predicted':
-                source_path = os.path.join(config.py_path,'predicted', f'{cube_name}_predicted.npz')
+                source_path = os.path.join(config.py_path,'predicted', f'{cube_name}_predicted.pkl')
             else:
                 raise ValueError(f'无效的类型: {type}')
             
