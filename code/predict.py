@@ -126,11 +126,110 @@ class Predict:
         cio.save_Predicted(predicted_cube=predicted, filepath=predicted_path)
         return predicted
     
+    def predict_cubes(self, cube_names, max_workers=1, callback=None):
+        """Predict multiple cubes in parallel.
+
+        Args:
+            cube_names: list of cube name strings.
+            max_workers: number of threads.
+            callback: optional function called with the result of each cube
+                prediction; used by GUI to update progress.
+        """
+    
 
     def predict_cubes(self, cube_names, max_workers=1):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(self.predict_single, cube_name) for cube_name in cube_names]
+            futures = {executor.submit(self.predict_single, cube_name): cube_name for cube_name in cube_names}
             for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if callback:
+                        try:
+                            callback(result)
+                        except Exception as e:
+                            print(f"Callback raised exception: {e}")
+                except Exception as e:
+                    print(f"Error occurred while predicting for cube: {e}")
+                
+
+
+
+    def _test(self, target_data, model, criterion):
+        """Perform validation on the validation set"""
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        top1 = AverageMeter()
+        incorrect = 0
+        Corr = 0
+        auroc = 0
+        total_correct = 0
+        total_num = 0
+
+        
+
+        # switch to evaluate mode
+        model.eval()
+        
+        y_true = []
+        y_pred = []
+        lens_list = []
+        lens_right = []
+        lens_wrong = []
+        l_r =0
+        l_w =0
+        a=0
+
+        # 转换target_data为torch张量
+        target_tensor = torch.from_numpy(target_data).float()
+        
+        # 加载all和all_label数据
+        all = np.load('features/features_Mn.npz')
+        all_label = np.load('features/labels_Mn.npz')
+        all = torch.from_numpy(all['arr_0']).float()
+        all_label = torch.from_numpy(all_label['arr_0']).float()
+        
+        # 移动到GPU
+        if torch.cuda.is_available():
+            target_tensor = target_tensor.cuda()
+            all = all.cuda()
+            all_label = all_label.cuda()
+
+        
+        
+        end = time.time()
+        batch_size = config.batch_size
+        n_samples = target_tensor.size(0)
+        # 分批处理数据（模拟原始函数的循环）
+        for start_idx in range(0, n_samples, batch_size):
+            end_idx = min(start_idx + batch_size, n_samples)
+            target_batch = target_tensor[start_idx:end_idx]
+            
+            with torch.no_grad():
+                target_var = torch.autograd.Variable(target_batch)
+
+            # compute output
+            output = model.predict(target_var, all, all_label)
+            
+            # measure metrics
+            output1 = output.cpu()
+            output_reg = np.maximum(output1.detach().numpy(),0)
+            output_class = np.argmax(output1.detach().numpy(), axis=1)
+            
+
+
+            #reg
+            # output1 = np.maximum(output1.detach().numpy(),0)
+            #class
+            # output2 = np.argmax(output1.detach().numpy(), axis=1)
+            
+            # #save class probability
+            # df1 = pd.DataFrame(output1.detach().numpy())
+            # df1.to_excel('class_pro.xlsx',
+                # index=False,
+                # engine='openpyxl')
+
+            y_pred.extend(output1.detach().numpy())
+        return y_pred
                 result = future.result()
                 # print(f"Predicted for cube: {result}")
                 
