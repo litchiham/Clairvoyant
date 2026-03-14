@@ -66,9 +66,6 @@ class Predict:
         for i in range(spectra_num):
             Myinput[i] = get3c(cube_rf[i], cube_lam)
             cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'INFO', flush = True)
-
-        
-        
         model = resnet_3c(num_classes=1)
         # get the number of model parameters
         print('Number of model parameters: {}'.format(
