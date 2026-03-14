@@ -15,7 +15,7 @@ from config import *
 class TkinterGui():
     def __init__(self,root:tk.Tk):
         self.root=root
-        self.root.title('gui_v0.2')
+        self.root.title('clairvoyant')
         self.root.geometry('700x500')
 
         # 设置样式
@@ -64,7 +64,7 @@ class TkinterGui():
         # 标题标签
         title_label = ttk.Label(
             main_frame, 
-            text="TkinterGui程序", 
+            text="Clairvoyant-可视化处理omega数据", 
             style='Title.TLabel'
         )
         title_label.grid(row=0, column=0, pady=(0, 10))
