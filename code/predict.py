@@ -64,7 +64,37 @@ class Predict:
         lats = cube.lat.reshape(-1, *(cube.lat.shape[2:])) # type: ignore
         lons = cube.lon.reshape(-1, *(cube.lon.shape[2:])) # type: ignore
         for i in range(spectra_num):
-            Myinput[i] = get3c(cube_rf[i], cube_lam)
+            # 跳过全NaN的数据
+            if np.isnan(cube_rf[i, :]).all():
+                # 全NaN的数据，填充0
+                Myinput[i] = np.zeros([3, 305], dtype=float)
+                continue
+                
+            # 处理不合理数据
+            temp = cube_rf[i, :].copy()  # 复制数据避免修改原始数据
+            temp[temp < 0] = np.nan
+            temp[temp > 1] = np.nan
+            
+            # 过滤NaN
+            y = list(temp)
+            x = list(cube_lam)
+            nan_index = []
+            for k in range(len(y)):
+                if np.isnan(y[k]):
+                    nan_index.append(k)
+                else:
+                    continue
+            
+            # 反序后删除
+            nan_index.reverse()
+            for m in nan_index:
+                y.pop(m)
+                x.pop(m)
+            f2 = interpolate.interp1d(x, y, kind='cubic', bounds_error=False, fill_value=np.nan)
+            x_pred = np.linspace(0.865, 2.385, num=305)
+            y_pred1 = f2(x_pred)
+            
+            Myinput[i] = get3c(y_pred1, x_pred)
             cio.log("Predict", f"{i/spectra_num*100:.2f}%", 'INFO', flush = True)
         model = resnet_3c(num_classes=1)
         # get the number of model parameters
@@ -137,71 +167,6 @@ class Predict:
                             print(f"Callback raised exception: {e}")
                 except Exception as e:
                     print(f"Error occurred while predicting for cube: {e}")
-                
-
-
-
-    def _test(self, target_data, model, criterion):
-        """Perform validation on the validation set"""
-        batch_time = AverageMeter()
-        losses = AverageMeter()
-        top1 = AverageMeter()
-        incorrect = 0
-        Corr = 0
-        auroc = 0
-        total_correct = 0
-        total_num = 0
-
-        
-
-        # switch to evaluate mode
-        model.eval()
-        
-        y_true = []
-        y_pred = []
-        lens_list = []
-        lens_right = []
-        lens_wrong = []
-        l_r =0
-        l_w =0
-        a=0
-
-        # 转换target_data为torch张量
-        target_tensor = torch.from_numpy(target_data).float()
-        
-        # 加载all和all_label数据
-        all = np.load('features/features_Mn.npz')
-        all_label = np.load('features/labels_Mn.npz')
-        all = torch.from_numpy(all['arr_0']).float()
-        all_label = torch.from_numpy(all_label['arr_0']).float()
-        
-        # 移动到GPU
-        if torch.cuda.is_available():
-            target_tensor = target_tensor.cuda()
-            all = all.cuda()
-            all_label = all_label.cuda()
-
-        
-        
-        end = time.time()
-        batch_size = config.batch_size
-        n_samples = target_tensor.size(0)
-        # 分批处理数据（模拟原始函数的循环）
-        for start_idx in range(0, n_samples, batch_size):
-            end_idx = min(start_idx + batch_size, n_samples)
-            target_batch = target_tensor[start_idx:end_idx]
-            
-            with torch.no_grad():
-                target_var = torch.autograd.Variable(target_batch)
-
-            # compute output
-            output = model.predict(target_var, all, all_label)
-            
-            # measure metrics
-            output1 = output.cpu()
-            output_reg = np.maximum(output1.detach().numpy(),0)
-            output_class = np.argmax(output1.detach().numpy(), axis=1)
-            
                 
 
 
@@ -280,9 +245,6 @@ def jxjz(x,y_uniform):
 def get3c(intensity,wavelengths):
     Myinput = np.zeros([3, 305], dtype=float)
     y_pred = jxjz(wavelengths,nor(SG(intensity)))
-    f2 = interpolate.interp1d(wavelengths,y_pred,kind='cubic')
-    x_pred = np.linspace(0.865,2.385,num=305)
-    y_pred = f2(x_pred)
     
 
     # original\n",
@@ -301,7 +263,7 @@ def get3c(intensity,wavelengths):
 if __name__ == '__main__':
     config.log_level='INFO'
     predict=Predict()
-    predicted = predict.predict_cubes(cube_names=['4238_4'], max_workers=2)
+    predicted = predict.predict_cubes(cube_names=['4238_4','4349_5','4424_2'], max_workers=2)
 
         
     

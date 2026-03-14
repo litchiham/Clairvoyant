@@ -583,7 +583,7 @@ class SimpleSphereViewer:
             # --- 右图：数据投影（2D）---
             # 创建2D投影：使用经纬度网格显示反射率
             # 使用pcolormesh进行2D投影
-            im = ax2.pcolormesh(lon, lat, reflectance, cmap=cmap, shading='auto')
+            im = ax2.pcolormesh(lon, lat, reflectance, cmap=cmap, shading='auto', vmin=-0.02, vmax = 0.07)
             
             # 为右图添加颜色条
             self.colorbar = self.fig.colorbar(im, ax=ax2, label='Reflectance')
