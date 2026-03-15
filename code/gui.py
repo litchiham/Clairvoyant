@@ -1,11 +1,10 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 import os
 import glob
 import threading
 import queue
-import time
 import subprocess
 import sys
 import process
@@ -72,6 +71,22 @@ class TkinterGui():
         # 保存主框架引用
         self.main_frame = main_frame
 
+    def _create_button(self, parent, text, command, row, column, **grid_opts):
+        """创建标准按钮并放置到网格中"""
+        btn = ttk.Button(parent, text=text, command=command)
+        btn.grid(row=row, column=column, sticky=tk.W, **grid_opts)
+        return btn
+
+    def _add_path_row(self, frame, row, label_text, var, select_cmd):
+        """在路径栏中创建一行：标签 + 文本 + 选择按钮"""
+        lbl = ttk.Label(frame, text=label_text, style='Status.TLabel')
+        lbl.grid(row=row, column=0, sticky=tk.W, padx=10)
+        txt = tk.Label(frame, textvariable=var, width=50, relief="sunken", bg="white", anchor="w", padx=5)
+        txt.grid(row=row, column=1, sticky=tk.W)
+        btn = ttk.Button(frame, text='选择路径', command=select_cmd)
+        btn.grid(row=row, column=2)
+        return (lbl, txt, btn)
+
     def create_notebook(self):
         """创建标签页容器"""
         # 创建Notebook（标签页控件）
@@ -110,19 +125,19 @@ class TkinterGui():
         # 显示当前文件路径
         self.file_label_preprocessing = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
         self.file_label_preprocessing.grid(row=1,column=0,sticky=tk.W,padx=5)
-        # 开始按钮
-        self.button_process0 = ttk.Button(frame,text="开始处理",command=self.process0,state=tk.NORMAL)
-        self.button_process0.grid(row=0,column=1,sticky=tk.W,padx=5)   
+
+        # 开始处理按钮
+        self.button_process0 = self._create_button(frame, "开始处理", self.process0, row=0, column=1, padx=5)
+
         # 显示按钮
-        button_show = ttk.Button(frame, text="显示",command=self.show0,state=tk.NORMAL)
-        button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)
+        self.button_show0 = self._create_button(frame, "显示", self.show0, row=2, column=1, padx=5, pady=5)
 
         # 进度条
         self.progress_var = tk.IntVar(value=0)
-        self.progressbar0 = ttk.Progressbar(frame, variable=self.progress_var,length=300)
-        self.progressbar0.grid(row=0,column=2,sticky=tk.W)    
-        self.progressbar0_label=ttk.Label(frame,text='',style='Status.TLabel')  
-        self.progressbar0_label.grid(row=0,column=3)
+        self.progressbar0 = ttk.Progressbar(frame, variable=self.progress_var, length=300)
+        self.progressbar0.grid(row=0, column=2, sticky=tk.W)
+        self.progressbar0_label = ttk.Label(frame, text='', style='Status.TLabel')
+        self.progressbar0_label.grid(row=0, column=3)
 
     def create_predicting_tab(self,notebook):
         """创建预测标签页"""
@@ -135,18 +150,18 @@ class TkinterGui():
 
         # 显示当前文件路径
         self.file_label_predicting = ttk.Label(frame, text="未选择Cube", foreground='gray', style='Status.TLabel')
-        self.file_label_predicting.grid(row=1,column=0,sticky=tk.W,padx=5)
-        # 处理按钮
-        self.button_process1 = ttk.Button(frame,text="开始预测",command=self.process1)
-        self.button_process1.grid(row=0,column=1,sticky=tk.W,padx=5)  
+        self.file_label_predicting.grid(row=1, column=0, sticky=tk.W, padx=5)
+
+        # 开始预测按钮
+        self.button_process1 = self._create_button(frame, "开始预测", self.process1, row=0, column=1, padx=5)
+
         # 显示按钮
-        button_show = ttk.Button(frame, text="显示",command=self.show1)
-        button_show.grid(row=2, column=1, sticky=tk.W, padx=5,pady=5)  
+        self.button_show1 = self._create_button(frame, "显示", self.show1, row=2, column=1, padx=5, pady=5)
 
         # 进度条
         self.predict_var = tk.IntVar(value=0)
-        self.progressbar1 = ttk.Progressbar(frame, variable=self.predict_var,length=300)
-        self.progressbar1.grid(row=0,column=2,sticky=tk.W)                
+        self.progressbar1 = ttk.Progressbar(frame, variable=self.predict_var, length=300)
+        self.progressbar1.grid(row=0, column=2, sticky=tk.W)
 
     def create_visualizing_tab(self,notebook):
         """创建可视化标签页"""
@@ -157,9 +172,11 @@ class TkinterGui():
         for i in range(6):
             frame.columnconfigure(i, weight=1)
 
-        # 显示按钮
-        self.button_show = ttk.Button(frame, text="显示",command=self.show_visualization)
-        self.button_show.grid(row=1, column=1, sticky=tk.W, padx=5,pady=5)  
+        # 显示 process 按钮
+        self.button_show_process = self._create_button(frame, "显示 process", self.show_process, row=1, column=1, padx=5, pady=5)
+
+        # 显示 predict 按钮
+        self.button_show_predict = self._create_button(frame, "显示 predict", self.show_predict, row=1, column=2, padx=5, pady=5)
 
     def create_pathbar(self):
         pathbar = ttk.LabelFrame(self.main_frame, text="工作路径")
@@ -173,33 +190,10 @@ class TkinterGui():
         for i in range(6):
             frame.columnconfigure(i, weight=1)
 
-        bin_path_label = ttk.Label(frame, text="bin_path", style='Status.TLabel')
-        bin_path_label.grid(row=0, column=0, sticky=tk.W,padx=10)
-        self.bin_path_bar = tk.Label(frame,textvariable=self.bin_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
-        self.bin_path_bar.grid(row=0,column=1,sticky=tk.W)
-        bin_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path0)
-        bin_path_btn.grid(row=0,column=2)
-
-        py_path_label = ttk.Label(frame, text="py_path", style='Status.TLabel')
-        py_path_label.grid(row=1, column=0, sticky=tk.W,padx=10)
-        self.py_path_bar = tk.Label(frame,textvariable=self.py_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
-        self.py_path_bar.grid(row=1,column=1,sticky=tk.W)
-        py_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path1)
-        py_path_btn.grid(row=1,column=2)
-
-        buffer_path_label = ttk.Label(frame, text="buffer_path", style='Status.TLabel')
-        buffer_path_label.grid(row=2, column=0, sticky=tk.W,padx=10)
-        self.buffer_path_bar = tk.Label(frame,textvariable=self.buffer_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
-        self.buffer_path_bar.grid(row=2,column=1,sticky=tk.W)
-        buffer_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path2)
-        buffer_path_btn.grid(row=2,column=2)
-
-        dust_path_label = ttk.Label(frame, text="dust_path", style='Status.TLabel')
-        dust_path_label.grid(row=3, column=0, sticky=tk.W,padx=10)
-        self.dust_path_bar = tk.Label(frame,textvariable=self.dust_path,width=50,relief="sunken",bg="white",anchor="w",padx=5)
-        self.dust_path_bar.grid(row=3,column=1,sticky=tk.W)
-        dust_path_btn = ttk.Button(frame,text='选择路径',command=self.select_path3)
-        dust_path_btn.grid(row=3,column=2)
+        self._add_path_row(frame, 0, "bin_path", self.bin_path, self.select_path0)
+        self._add_path_row(frame, 1, "py_path", self.py_path, self.select_path1)
+        self._add_path_row(frame, 2, "buffer_path", self.buffer_path, self.select_path2)
+        self._add_path_row(frame, 3, "dust_path", self.dust_path, self.select_path3)
     # 事件处理方法
     def button_clicked_example(self):
         """按钮点击事件处理"""
@@ -236,12 +230,19 @@ class TkinterGui():
         threading.Thread(target=self._worker, args=(f,self.q0), daemon=True).start()
     def show0(self):
         pass
-    def show_visualization(self):
-        """启动可视化窗口"""
+    def show_process(self):
+        """启动 process 可视化窗口"""
         try:
             subprocess.Popen([sys.executable, 'code/gui-vis.py'])
         except Exception as e:
-            messagebox.showerror("错误", f"无法启动可视化窗口: {e}")
+            messagebox.showerror("错误", f"无法启动 process 可视化窗口: {e}")
+
+    def show_predict(self):
+        """启动 predict 可视化窗口"""
+        try:
+            subprocess.Popen([sys.executable, 'code/gui-vis2.py'])
+        except Exception as e:
+            messagebox.showerror("错误", f"无法启动 predict 可视化窗口: {e}")
     def extract_cube_names(self,folder):
         '''获取当前目录下所有 ORBxxxx_x_DATA 文件夹中的 xxxx_x 部分，并返回列表'''
         result = []
