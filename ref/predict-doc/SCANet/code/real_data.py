@@ -76,7 +76,7 @@ class DataLoaderX(DataLoader):
 def Load_intensity_3c():
     print('Data Loading...')        
     
-    data_dir = 'Mars.xlsx'
+    data_dir = r'Mars.xlsx'
     spectra_num = 3
     Myinput = np.zeros([spectra_num, 3, 305], dtype=float)
     
@@ -99,7 +99,7 @@ def Load_intensity_3c():
         Myinput[i][1][1:] = y_pred
         #2st
         y_pred = np.diff(y_pred)  
-        Myinput[i][1][1:-1] = y_pred
+        Myinput[i][2][1:-1] = y_pred
                                 
     SpectrumData = Myinput
     

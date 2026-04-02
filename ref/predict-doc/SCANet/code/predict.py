@@ -20,7 +20,7 @@ from sklearn import metrics
 import pickle
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 parser = argparse.ArgumentParser(description='PyTorch SCANet predicting')
 parser.add_argument('-b', '--batch-size', default=64, type=int,
                     help='mini-batch size (default: 64)')
@@ -140,6 +140,8 @@ def test(test_loader, model, criterion):
         
         # measure metrics       
         output1 = output.cpu()
+        output2 = np.argmax(output1.detach().numpy(), axis=1)
+        print(output2)
         #reg
         # output1 = np.maximum(output1.detach().numpy(),0)
         #class
@@ -151,7 +153,6 @@ def test(test_loader, model, criterion):
             # index=False,         
             # engine='openpyxl')   
 
-        y_pred.extend(output1.tolist())
 
 
 
